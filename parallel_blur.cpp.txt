@@ -1,0 +1,60 @@
+#include <stdio.h>
+#include <opencv2/opencv.hpp> // OpenCV for image handling
+#include <omp.h> // OpenMP for parallelization
+
+using namespace cv;
+
+#define BLUR_SIZE 45 // Kernel size for more blur effect
+
+int main() {
+    // Load the input image
+    Mat input_image = imread("input.jpg", IMREAD_COLOR);
+    if (input_image.empty()) {
+        printf("Error: Image could not be loaded.\n");
+        return -1;
+    }
+
+    // Get the image dimensions
+    int width = input_image.cols;
+    int height = input_image.rows;
+
+    // Create an output image with the same size and type
+    Mat output_image = input_image.clone();
+
+    // Convert to floating point for more precise calculations
+    input_image.convertTo(input_image, CV_32F);
+    output_image.convertTo(output_image, CV_32F);
+
+    // Apply a parallelized 3x3 blur filter using OpenMP
+    #pragma omp parallel for collapse(2)
+    for (int y = 1; y < height - 1; y++) {
+        for (int x = 1; x < width - 1; x++) {
+            Vec3f sum = Vec3f(0.0, 0.0, 0.0);
+
+            // Apply the blur filter (45x45 kernel for strong blur)
+            for (int ky = -BLUR_SIZE / 2; ky <= BLUR_SIZE / 2; ky++) {
+                for (int kx = -BLUR_SIZE / 2; kx <= BLUR_SIZE / 2; kx++) {
+                    // Ensure we're within the image bounds
+                    int yy = std::min(std::max(y + ky, 0), height - 1);
+                    int xx = std::min(std::max(x + kx, 0), width - 1);
+
+                    Vec3f pixel = input_image.at<Vec3f>(yy, xx);
+                    sum += pixel;
+                }
+            }
+
+            // Average the sum of the kernel
+            output_image.at<Vec3f>(y, x) = sum / (BLUR_SIZE * BLUR_SIZE);
+        }
+    }
+
+    // Convert the output image back to 8-bit
+    output_image.convertTo(output_image, CV_8U);
+
+    // Save the blurred image
+    imwrite("output_more_blurred.jpg", output_image);
+
+    printf("Image processing with more blur done. Output saved as output_more_blurred.jpg\n");
+
+    return 0;
+}
